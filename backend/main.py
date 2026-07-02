@@ -43,9 +43,14 @@ YDL_OPTIONS = {
     "format": "best",
     "quiet": False,
     "nocheckcertificate": True,
+    "geo_bypass": True,
+    "extractor_args": {
+        "youtube": {
+            "player_client": "android",
+        }
+    },
     "http_headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-        "Referer": "https://www.tiktok.com/",
     },
 }
 
@@ -85,9 +90,9 @@ def extract_video():
         if not os.path.exists(COOKIE_PATH):
             return jsonify({"detail": "Cookies file missing on server"}), 500
 
-        # Prepare options per-request so we only pass a cookiefile when valid
+        # Prepare options per-request and pass cookiefile if any cookies are available
         options = dict(YDL_OPTIONS)
-        if os.path.exists(COOKIE_PATH) and _looks_like_netscape_cookie_file(COOKIE_PATH):
+        if os.path.exists(COOKIE_PATH) and os.path.getsize(COOKIE_PATH) > 0:
             options["cookiefile"] = COOKIE_PATH
 
         with yt_dlp.YoutubeDL(options) as ydl:
@@ -142,7 +147,12 @@ def extract_video():
                 "download_url": f"/api/proxy?url={quote(video_url, safe='')}"
             })
     except Exception as exc:
-        return jsonify({"detail": str(exc)}), 500
+        error_text = str(exc)
+        if "sign in to confirm" in error_text.lower() or "cookies-from-browser" in error_text.lower() or "pass cookies" in error_text.lower():
+            return jsonify({
+                "detail": "YouTube requires login cookies for this video. Set COOKIES_CONTENT with browser-exported cookies.txt on the backend."
+            }), 500
+        return jsonify({"detail": error_text}), 500
 
 @app.route("/api/proxy")
 def proxy_video():
