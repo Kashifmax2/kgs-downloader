@@ -11,4 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4"]
+ENV PORT=8000
+
+# Use shell form so $PORT is expanded at container runtime by the shell.
+# Provide a default of 8000 if PORT is not set by the environment.
+ENTRYPOINT sh -c 'exec gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4'
