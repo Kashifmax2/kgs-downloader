@@ -1,6 +1,5 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import yt_dlp
 import logging
 
@@ -8,55 +7,26 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(
-    title="Video Downloader API",
-    description="Extract video download links using yt-dlp",
-    version="1.0.0"
-)
+app = Flask(__name__)
+CORS(app)  # CORS middleware automatic handle ho jayega
 
-# CORS configuration for frontend access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({"message": "Video Downloader API is running", "status": "ok"})
 
+@app.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy"})
 
-class DownloadRequest(BaseModel):
-    url: str
+@app.route("/api/download", methods=["POST"])
+def extract_video():
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({"detail": "URL is required"}), 400
 
-
-class DownloadResponse(BaseModel):
-    title: str
-    thumbnail: str | None = None
-    duration: str | None = None
-    download_url: str
-    format: str = "mp4"
-    quality: str = "best"
-
-
-@app.get("/")
-async def root():
-    return {"message": "Video Downloader API is running", "status": "ok"}
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-
-@app.post("/api/download", response_model=DownloadResponse)
-async def extract_video(request: DownloadRequest):
-    """
-    Extract direct download URL from a video platform URL.
-    Uses yt-dlp to extract video information without downloading.
-    """
-    if not request.url or not request.url.strip():
-        raise HTTPException(status_code=400, detail="URL is required")
-
-    url = request.url.strip()
+    url = data['url'].strip()
+    if not url:
+        return jsonify({"detail": "URL is required"}), 400
 
     ydl_opts = {
         'quiet': True,
@@ -72,32 +42,23 @@ async def extract_video(request: DownloadRequest):
             info = ydl.extract_info(url, download=False)
 
             if not info:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Could not extract video information"
-                )
+                return jsonify({"detail": "Could not extract video information"}), 404
 
-            # Get the direct download URL
+            # Direct download URL
             download_url = info.get('url')
             if not download_url:
-                # Try to get URL from requested_formats
                 if 'requested_formats' in info:
                     for fmt in info['requested_formats']:
                         if fmt.get('url'):
                             download_url = fmt['url']
                             break
-
-                # Fallback to entries if it's a playlist
                 if not download_url and 'entries' in info:
                     entries = list(info['entries'])
                     if entries and entries[0]:
                         download_url = entries[0].get('url')
 
             if not download_url:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Could not extract download URL"
-                )
+                return jsonify({"detail": "Could not extract download URL"}), 404
 
             # Format duration
             duration = None
@@ -110,35 +71,18 @@ async def extract_video(request: DownloadRequest):
                 else:
                     duration = f"{mins}:{secs:02d}"
 
-            return DownloadResponse(
-                title=info.get('title', 'Untitled Video'),
-                thumbnail=info.get('thumbnail'),
-                duration=duration,
-                download_url=download_url,
-                format="mp4",
-                quality=info.get('format_note', 'best')
-            )
+            return jsonify({
+                "title": info.get('title', 'Untitled Video'),
+                "thumbnail": info.get('thumbnail'),
+                "duration": duration,
+                "download_url": download_url,
+                "format": "mp4",
+                "quality": info.get('format_note', 'best')
+            })
 
-    except yt_dlp.utils.DownloadError as e:
-        logger.error(f"Download error: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Could not process video URL: {str(e)}"
-        )
-    except yt_dlp.utils.ExtractorError as e:
-        logger.error(f"Extractor error: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Could not extract video: {str(e)}"
-        )
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred: {str(e)}"
-        )
-
+        logger.error(f"Error: {str(e)}")
+        return jsonify({"detail": f"An error occurred: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=8000)
