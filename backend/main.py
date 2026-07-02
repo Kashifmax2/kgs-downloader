@@ -1,8 +1,8 @@
+import os
+import logging
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests  # <-- Humne yt-dlp ki jagah requests use kiya hai
-import logging
-import os
+import yt_dlp
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -11,13 +11,22 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
+# yt-dlp Options for "Human-like" behavior
+YDL_OPTIONS = {
+    'format': 'best',
+    'quiet': True,
+    'no_warnings': True,
+    'nocheckcertificate': True,
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
+}
+
 @app.route("/", methods=["GET"])
 def root():
-    return jsonify({"message": "Video Downloader API is running", "status": "ok"})
-
-@app.route("/health", methods=["GET"])
-def health_check():
-    return jsonify({"status": "healthy"})
+    return jsonify({"message": "Downloader API Active", "status": "ok"})
 
 @app.route("/api/download", methods=["POST"])
 def extract_video():
@@ -27,35 +36,31 @@ def extract_video():
     if not url:
         return jsonify({"detail": "URL is required"}), 400
 
-    # Cobalt API ka istemal (Sabse stable aur fast)
-    api_url = "https://api.cobalt.tools/api/json"
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "url": url,
-        "isAudioOnly": False,
-        "disableMetadata": True
-    }
-
     try:
-        response = requests.post(api_url, json=payload, headers=headers)
-        result = response.json()
+        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+            logger.info(f"Extracting info for: {url}")
+            info = ydl.extract_info(url, download=False)
+            
+            # Fetch direct URL
+            video_url = info.get('url')
+            if not video_url and 'formats' in info:
+                # Find best format if direct url not found
+                for f in info['formats']:
+                    if f.get('url'):
+                        video_url = f['url']
+                        break
 
-        if response.status_code != 200 or result.get("status") == "error":
-            return jsonify({"detail": result.get("text", "Error occurred")}), 400
-
-        # API se milne wala data return kar rahe hain
-        return jsonify({
-            "title": result.get("picker", [{}])[0].get("name", "Video"),
-            "download_url": result.get("url"),
-            "format": "mp4"
-        })
+            return jsonify({
+                "title": info.get('title', 'Video'),
+                "thumbnail": info.get('thumbnail'),
+                "download_url": video_url,
+                "duration": info.get('duration_string'),
+                "error": None
+            })
 
     except Exception as e:
-        logger.error(f"API Error: {str(e)}")
-        return jsonify({"detail": f"API Error: {str(e)}"}), 500
+        logger.error(f"Scraper Error: {str(e)}")
+        return jsonify({"detail": f"Scraper Error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))

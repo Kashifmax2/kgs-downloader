@@ -11,10 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# --- SABSE ZAROORI PART ---
+# Yeh command har build ke waqt yt-dlp ko latest version par update karegi
+RUN pip install -U yt-dlp
+# --------------------------
+
 # Copy application code
+# AGAR tumhari main.py 'backend' folder ke andar hai, toh COPY backend/main.py . karna
 COPY main.py .
 
-# Railway dynamic port use karta hai, isliye EXPOSE ki zaroorat nahi hoti (hata diya)
-
-# Run the application using Flask/Python instead of Uvicorn
+# Run the application
 CMD ["python", "main.py"]
