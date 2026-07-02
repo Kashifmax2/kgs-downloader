@@ -1,5 +1,5 @@
 import os
-from urllib.parse import quote_plus
+from urllib.parse import quote
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import requests
@@ -139,7 +139,7 @@ def extract_video():
             return jsonify({
                 "title": info.get("title"),
                 "thumbnail": info.get("thumbnail"),
-                "download_url": f"/api/proxy?url={quote_plus(video_url)}",
+                "download_url": f"/api/proxy?url={quote(video_url, safe='')}"
             })
     except Exception as exc:
         return jsonify({"detail": str(exc)}), 500
@@ -154,11 +154,11 @@ def proxy_video():
         remote = requests.get(
             url,
             headers={
-                "Referer": "https://www.tiktok.com/",
-                "User-Agent": "Mozilla/5.0",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
             },
+            allow_redirects=True,
             stream=True,
-            timeout=30,
+            timeout=60,
         )
         if remote.status_code != 200:
             return jsonify({"detail": f"Remote request failed with status {remote.status_code}"}), remote.status_code
