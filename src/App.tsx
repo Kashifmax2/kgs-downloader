@@ -82,7 +82,6 @@ function App() {
         throw new Error('No downloadable content found');
       }
 
-      const apiUrl = import.meta.env.VITE_API_URL || '';
       const downloadUrl = data.download_url.startsWith('/api/')
         ? `${apiUrl}${data.download_url}`
         : data.download_url;
