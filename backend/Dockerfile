@@ -14,8 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 
-# Expose port
-EXPOSE 8000
+# Railway dynamic port use karta hai, isliye EXPOSE ki zaroorat nahi hoti (hata diya)
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application using Flask/Python instead of Uvicorn
+CMD ["python", "main.py"]

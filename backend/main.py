@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import yt_dlp
 import logging
+import os  # <-- Dynamic Port ke liye add kiya
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -99,4 +100,6 @@ def extract_video():
         return jsonify({"detail": f"Scraper Error: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    # Cloud (Railway) par dynamic port uthane ke liye change kiya
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
