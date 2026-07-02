@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { Download, Loader2, Video, AlertCircle, Sparkles, Shield, Zap, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 
+interface FormatOption {
+  label: string;
+  quality: string;
+  ext: string;
+  format_id: string;
+  height: number;
+  tbr: number;
+  url: string;
+}
+
 interface VideoResult {
   title: string;
   thumbnail?: string;
@@ -8,6 +18,7 @@ interface VideoResult {
   downloadUrl: string;
   format: string;
   quality: string;
+  formats?: FormatOption[];
 }
 
 interface FAQItem {
@@ -47,7 +58,25 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VideoResult | null>(null);
+  const [selectedQuality, setSelectedQuality] = useState<string | null>(null);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+
+  const apiUrl = import.meta.env.VITE_API_URL || '';
+
+  const handleQualityChange = (quality: string) => {
+    setSelectedQuality(quality);
+    if (!result?.formats) {
+      return;
+    }
+
+    const selected = result.formats.find((fmt) => fmt.quality === quality);
+    if (!selected) {
+      return;
+    }
+
+    const downloadUrl = selected.url.startsWith('/api/') ? `${apiUrl}${selected.url}` : selected.url;
+    setResult({ ...result, downloadUrl, quality: selected.quality });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,13 +91,15 @@ function App() {
     setResult(null);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${apiUrl}/api/download`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({
+          url: url.trim(),
+          quality: selectedQuality,
+        }),
       });
 
       if (!response.ok) {
@@ -86,6 +117,9 @@ function App() {
         ? `${apiUrl}${data.download_url}`
         : data.download_url;
 
+      const formats = data.formats || [];
+      const initialQuality = data.quality || (formats[0]?.quality ?? 'best');
+      setSelectedQuality(initialQuality);
       setResult({
         title: data.title || 'Video',
         thumbnail: data.thumbnail,
@@ -93,6 +127,7 @@ function App() {
         downloadUrl,
         format: data.format || 'mp4',
         quality: data.quality || 'best',
+        formats,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
@@ -220,13 +255,33 @@ function App() {
                 <h3 className="text-xl font-semibold text-white mb-2 line-clamp-2">
                   {result.title}
                 </h3>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Video className="w-4 h-4" aria-hidden="true" />
-                    <span>{result.format.toUpperCase()} - {result.quality}</span>
+                <div className="flex flex-col gap-4 text-sm text-gray-500 mb-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Video className="w-4 h-4" aria-hidden="true" />
+                      <span>{result.format.toUpperCase()} - {result.quality}</span>
+                    </div>
+                    {result.duration && (
+                      <span>Duration: {result.duration}</span>
+                    )}
                   </div>
-                  {result.duration && (
-                    <span>Duration: {result.duration}</span>
+
+                  {result.formats && result.formats.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs uppercase tracking-[0.2em] text-gray-400">Choose quality</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {result.formats.map((format) => (
+                          <button
+                            key={format.format_id}
+                            type="button"
+                            onClick={() => handleQualityChange(format.quality)}
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${selectedQuality === format.quality ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-gray-700 bg-dark-300 text-gray-300 hover:border-primary-500 hover:text-white'}`}
+                          >
+                            {format.quality}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
                 <button

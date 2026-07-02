@@ -75,6 +75,52 @@ def _looks_like_netscape_cookie_file(path: str) -> bool:
     except Exception:
         return False
 
+
+def _build_format_options(info):
+    formats = info.get("formats") or []
+    options = []
+    seen = set()
+
+    for fmt in formats:
+        if not fmt or not fmt.get("url"):
+            continue
+
+        if fmt.get("acodec") == "none" or fmt.get("vcodec") == "none":
+            continue
+
+        height = fmt.get("height")
+        if height:
+            quality = f"{height}p"
+        else:
+            quality = fmt.get("format_note") or fmt.get("format_id") or "unknown"
+
+        ext = fmt.get("ext") or "mp4"
+        fps = fmt.get("fps")
+        label = quality
+        if fps:
+            label += f" {fps}fps"
+        label = f"{label} · {ext}"
+
+        format_id = fmt.get("format_id") or quality
+        key = (quality, ext, format_id)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        options.append({
+            "label": label,
+            "quality": quality,
+            "ext": ext,
+            "format_id": format_id,
+            "height": height or 0,
+            "tbr": fmt.get("tbr") or 0,
+            "url": f"/api/proxy?url={quote(fmt.get('url'), safe='')}"
+        })
+
+    options.sort(key=lambda item: (item["height"], item["tbr"]), reverse=True)
+    return options
+
+
 @app.route("/", methods=["GET"])
 def root():
     return jsonify({"message": "Downloader Active", "status": "ok"})
@@ -138,13 +184,30 @@ def extract_video():
                     if best:
                         video_url = best.get("url")
 
-            if not video_url:
-                return jsonify({"detail": "Unable to extract video URL"}), 500
+            formats = []
+            if isinstance(info, dict):
+                formats = _build_format_options(info)
+
+            selected_format = None
+            quality = data.get("quality")
+            if quality and formats:
+                for fmt in formats:
+                    if fmt["quality"] == quality:
+                        selected_format = fmt
+                        break
+
+            if not selected_format and formats:
+                selected_format = formats[0]
+
+            download_url = selected_format["url"] if selected_format else f"/api/proxy?url={quote(video_url, safe='')}"
+            result_quality = selected_format["quality"] if selected_format else "best"
 
             return jsonify({
                 "title": info.get("title"),
                 "thumbnail": info.get("thumbnail"),
-                "download_url": f"/api/proxy?url={quote(video_url, safe='')}"
+                "download_url": download_url,
+                "formats": formats,
+                "quality": result_quality,
             })
     except Exception as exc:
         error_text = str(exc)
