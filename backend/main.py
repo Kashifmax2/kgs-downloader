@@ -71,6 +71,17 @@ def _looks_like_netscape_cookie_file(path: str) -> bool:
         return False
 
 
+def _should_use_direct_download(url: str | None, extractor_key: str | None = None) -> bool:
+    if not url:
+        return False
+    lower = url.lower()
+    if extractor_key:
+        extractor_key = extractor_key.lower()
+        if extractor_key in ("tiktok", "instagram"):
+            return True
+    return any(platform in lower for platform in ("tiktok.com", "instagram.com", "cdninstagram.com"))
+
+
 def _build_format_options(info):
     formats = info.get("formats") or []
     best = {}
@@ -233,14 +244,20 @@ def extract_video():
             if not selected_format and formats:
                 selected_format = formats[0]
 
-            download_url = selected_format["proxy_url"] if selected_format else f"/api/proxy?url={quote(video_url, safe='')}"
+            direct_video_url = selected_format["url"] if selected_format else video_url
+            if _should_use_direct_download(direct_video_url, info.get("extractor_key")):
+                download_url = direct_video_url
+            else:
+                download_url = selected_format["proxy_url"] if selected_format else f"/api/proxy?url={quote(video_url, safe='')}"
+
             result_quality = selected_format["quality"] if selected_format else "best"
 
             return jsonify({
                 "title": info.get("title"),
                 "thumbnail": info.get("thumbnail"),
+                "extractor": info.get("extractor_key"),
                 "download_url": download_url,
-                "direct_url": selected_format["url"] if selected_format else video_url,
+                "direct_url": direct_video_url,
                 "proxy_url": selected_format["proxy_url"] if selected_format else (f"/api/proxy?url={quote(video_url, safe='')}" if video_url else None),
                 "formats": formats,
                 "quality": result_quality,
@@ -249,9 +266,9 @@ def extract_video():
     except Exception as exc:
         error_text = str(exc)
         lower_error = error_text.lower()
-        if "cookies-from-browser" in lower_error or "pass cookies" in lower_error or "sign in to confirm" in lower_error:
+        if "cookies-from-browser" in lower_error or "pass cookies" in lower_error or "sign in to confirm" in lower_error or "instagram api is not granting access" in lower_error:
             return jsonify({
-                "detail": "This video may require browser login cookies to download. Set COOKIES_CONTENT with browser-exported cookies.txt on the backend."
+                "detail": "This video may require browser login cookies to download, or the post may only be accessible when signed in. Set COOKIES_CONTENT with browser-exported cookies.txt on the backend or use a public video URL."
             }), 500
         return jsonify({"detail": error_text}), 500
 
@@ -275,9 +292,17 @@ def _build_proxy_headers(url: str) -> dict:
         'Accept-Encoding': 'gzip, deflate, br',
         'Connection': 'keep-alive',
         'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Site': 'cross-site',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Dest': 'video',
+        'Origin': 'https://www.tiktok.com' if 'tiktok.com' in hostname else ('https://www.instagram.com' if 'instagram.com' in hostname or 'cdninstagram.com' in hostname else None),
+        'Range': 'bytes=0-',
     }
     if referer:
         headers['Referer'] = referer
+    if headers['Origin'] is None:
+        headers.pop('Origin')
     return headers
 
 
