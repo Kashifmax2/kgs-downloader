@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Loader2, Video, AlertCircle, Sparkles, Shield, Zap, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FormatOption {
@@ -63,8 +63,42 @@ function App() {
   const [result, setResult] = useState<VideoResult | null>(null);
   const [selectedFormatId, setSelectedFormatId] = useState<string | null>(null);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [showAdOverlay, setShowAdOverlay] = useState(false);
+  const [adCountdown, setAdCountdown] = useState(4);
+  const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null);
 
   const apiUrl = import.meta.env.VITE_API_URL || '';
+
+  useEffect(() => {
+    const initScript = document.createElement('script');
+    initScript.type = 'text/javascript';
+    initScript.innerHTML = `
+      atOptions = {
+        'key' : '56dc67e7fb7e32c9fcfe7e5468e8aa03',
+        'format' : 'iframe',
+        'height' : 250,
+        'width' : 300,
+        'params' : {}
+      };
+    `;
+
+    const loadScript = document.createElement('script');
+    loadScript.src = 'https://www.highperformanceformat.com/56dc67e7fb7e32c9fcfe7e5468e8aa03/invoke.js';
+    loadScript.async = true;
+
+    const bannerContainer = document.getElementById('adsterra-banner');
+    if (bannerContainer) {
+      bannerContainer.appendChild(initScript);
+      bannerContainer.appendChild(loadScript);
+    }
+
+    return () => {
+      if (bannerContainer) {
+        bannerContainer.removeChild(initScript);
+        bannerContainer.removeChild(loadScript);
+      }
+    };
+  }, []);
 
   const handleFormatChange = (formatId: string) => {
     if (!result?.formats) {
@@ -143,7 +177,31 @@ function App() {
   };
 
   const handleDownload = (downloadUrl: string) => {
-    window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+    setPendingDownloadUrl(downloadUrl);
+    setAdCountdown(4);
+    setShowAdOverlay(true);
+  };
+
+  useEffect(() => {
+    if (!showAdOverlay || adCountdown <= 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setAdCountdown((count) => Math.max(count - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [showAdOverlay, adCountdown]);
+
+  const openDownloadAfterAd = () => {
+    if (!pendingDownloadUrl) {
+      return;
+    }
+
+    window.open(pendingDownloadUrl, '_blank', 'noopener,noreferrer');
+    setShowAdOverlay(false);
+    setPendingDownloadUrl(null);
   };
 
   const selectedFormat = result?.formats?.find((fmt) => fmt.format_id === selectedFormatId) || result?.formats?.[0];
@@ -172,6 +230,13 @@ function App() {
       {/* Top Ad Placeholder */}
       <aside className="ad-placeholder h-20 mx-4 mt-4 md:mx-8 md:mt-6" aria-label="Advertisement">
         Advertisement Space
+      </aside>
+
+      {/* Adsterra Banner */}
+      <aside id="adsterra-banner" className="ad-placeholder mx-4 mt-4 md:mx-8 md:mt-6">
+        <div className="h-[250px] w-[300px] border border-dashed border-gray-700 bg-dark-300/70 flex items-center justify-center text-sm text-gray-400">
+          Banner ad loading...
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -355,6 +420,27 @@ function App() {
               </div>
             </div>
           </section>
+
+          {showAdOverlay && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+              <div className="max-w-lg w-full rounded-3xl bg-slate-950 border border-white/10 p-6 text-center shadow-2xl">
+                <p className="text-sm text-gray-400 mb-4">
+                  Advertisement is playing. Your download will start after the countdown.
+                </p>
+                <div className="ad-placeholder h-48 rounded-2xl border border-dashed border-gray-700 bg-dark-300/70 flex items-center justify-center text-sm text-gray-400 mb-6">
+                  Adsterra pre-download ad area
+                </div>
+                <button
+                  type="button"
+                  disabled={adCountdown > 0}
+                  onClick={openDownloadAfterAd}
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {adCountdown > 0 ? `Continue in ${adCountdown}s` : 'Continue to Download'}
+                </button>
+              </div>
+            </div>
+          )}
         )}
 
         {/* Features Section */}
@@ -454,8 +540,15 @@ function App() {
       </main>
 
       {/* Bottom Ad Placeholder */}
-      <aside className="ad-placeholder h-24 mx-4 mb-4 md:mx-8 md:mb-6" aria-label="Advertisement">
-        Advertisement Space
+      <aside className="ad-placeholder h-24 mx-4 mb-4 md:mx-8 md:mb-6 flex items-center justify-center" aria-label="Advertisement">
+        <a
+          href="https://www.effectivecpmnetwork.com/mdrtjss3?key=3edf8878add033a6f4dfc73d278d77d5"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-sm text-white underline"
+        >
+          Click here for more offers and download partners
+        </a>
       </aside>
 
       {/* Footer */}
