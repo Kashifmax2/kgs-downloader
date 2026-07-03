@@ -5,6 +5,12 @@ from flask_cors import CORS
 import requests
 import yt_dlp
 
+try:
+    import yt_dlp_impersonate  # noqa: F401
+    YTDLP_IMPERSONATE_AVAILABLE = True
+except ImportError:
+    YTDLP_IMPERSONATE_AVAILABLE = False
+
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
@@ -46,6 +52,7 @@ YDL_OPTIONS = {
     "geo_bypass": True,
     "http_headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
     },
 }
 
@@ -186,6 +193,9 @@ def extract_video():
         if os.path.exists(COOKIE_PATH) and os.path.getsize(COOKIE_PATH) > 0:
             options["cookiefile"] = COOKIE_PATH
 
+        if YTDLP_IMPERSONATE_AVAILABLE and "tiktok.com" in url.lower():
+            options["impersonate"] = "chrome"
+
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=False)
 
@@ -268,7 +278,7 @@ def extract_video():
         lower_error = error_text.lower()
         if "cookies-from-browser" in lower_error or "pass cookies" in lower_error or "sign in to confirm" in lower_error or "instagram api is not granting access" in lower_error:
             return jsonify({
-                "detail": "This video may require browser login cookies to download, or the post may only be accessible when signed in. Set COOKIES_CONTENT with browser-exported cookies.txt on the backend or use a public video URL."
+                "detail": "Instagram posts often require login cookies when they are restricted, and TikTok may require impersonation support. Set COOKIES_CONTENT with browser-exported cookies.txt on the backend for Instagram, or deploy with yt-dlp impersonation support for TikTok."
             }), 500
         return jsonify({"detail": error_text}), 500
 
@@ -324,11 +334,17 @@ def proxy_video():
             return jsonify({"detail": f"Remote request failed with status {remote.status_code}"}), remote.status_code
 
         response_headers = {
-            "Content-Disposition": "attachment; filename=\"video.mp4\""
+            "Content-Disposition": "attachment; filename=\"video.mp4\"",
         }
         content_type = remote.headers.get("Content-Type") or "application/octet-stream"
         if remote.headers.get("Content-Disposition"):
             response_headers["Content-Disposition"] = remote.headers.get("Content-Disposition")
+        if remote.headers.get("Content-Range"):
+            response_headers["Content-Range"] = remote.headers.get("Content-Range")
+        if remote.headers.get("Accept-Ranges"):
+            response_headers["Accept-Ranges"] = remote.headers.get("Accept-Ranges")
+        if remote.headers.get("Content-Length"):
+            response_headers["Content-Length"] = remote.headers.get("Content-Length")
 
         return Response(
             remote.iter_content(chunk_size=1024 * 1024),
