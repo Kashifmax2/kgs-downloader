@@ -69,6 +69,7 @@ function App() {
   const [popunderLoaded, setPopunderLoaded] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL || '';
+  const adPopunderUrl = 'https://www.effectivecpmnetwork.com/mdrtjss3?key=3edf8878add033a6f4dfc73d278d77d5';
 
   useEffect(() => {
     const bannerContainer = document.getElementById('adsterra-banner');
@@ -184,6 +185,12 @@ function App() {
   };
 
   const handleDownload = (downloadUrl: string) => {
+    try {
+      window.open(adPopunderUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      // If popup is blocked, still continue with the overlay.
+    }
+
     setPendingDownloadUrl(downloadUrl);
     setAdCountdown(4);
     setShowAdOverlay(true);
