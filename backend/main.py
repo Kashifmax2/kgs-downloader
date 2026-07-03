@@ -1,5 +1,5 @@
 import os
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import requests
@@ -248,11 +248,38 @@ def extract_video():
             })
     except Exception as exc:
         error_text = str(exc)
-        if "sign in to confirm" in error_text.lower() or "cookies-from-browser" in error_text.lower() or "pass cookies" in error_text.lower():
+        lower_error = error_text.lower()
+        if "cookies-from-browser" in lower_error or "pass cookies" in lower_error or "sign in to confirm" in lower_error:
             return jsonify({
-                "detail": "YouTube requires login cookies for this video. Set COOKIES_CONTENT with browser-exported cookies.txt on the backend."
+                "detail": "This video may require browser login cookies to download. Set COOKIES_CONTENT with browser-exported cookies.txt on the backend."
             }), 500
         return jsonify({"detail": error_text}), 500
+
+def _build_proxy_headers(url: str) -> dict:
+    parsed = urlparse(url)
+    referer = None
+    hostname = parsed.hostname or ''
+    if 'tiktok.com' in hostname:
+        referer = 'https://www.tiktok.com/'
+    elif 'instagram.com' in hostname or 'cdninstagram.com' in hostname:
+        referer = 'https://www.instagram.com/'
+    elif 'facebook.com' in hostname or 'fbcdn.net' in hostname:
+        referer = 'https://www.facebook.com/'
+    elif 'youtube.com' in hostname or 'googlevideo.com' in hostname or 'youtu.be' in hostname:
+        referer = 'https://www.youtube.com/'
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache',
+    }
+    if referer:
+        headers['Referer'] = referer
+    return headers
+
 
 @app.route("/api/proxy")
 def proxy_video():
@@ -263,9 +290,7 @@ def proxy_video():
     try:
         remote = requests.get(
             url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-            },
+            headers=_build_proxy_headers(url),
             allow_redirects=True,
             stream=True,
             timeout=60,
