@@ -69,37 +69,6 @@ function App() {
 
   const apiUrl = import.meta.env.VITE_API_URL || '';
 
-  useEffect(() => {
-    const initScript = document.createElement('script');
-    initScript.type = 'text/javascript';
-    initScript.innerHTML = `
-      atOptions = {
-        'key' : '56dc67e7fb7e32c9fcfe7e5468e8aa03',
-        'format' : 'iframe',
-        'height' : 250,
-        'width' : 300,
-        'params' : {}
-      };
-    `;
-
-    const loadScript = document.createElement('script');
-    loadScript.src = 'https://www.highperformanceformat.com/56dc67e7fb7e32c9fcfe7e5468e8aa03/invoke.js';
-    loadScript.async = true;
-
-    const bannerContainer = document.getElementById('adsterra-banner');
-    if (bannerContainer) {
-      bannerContainer.appendChild(initScript);
-      bannerContainer.appendChild(loadScript);
-    }
-
-    return () => {
-      if (bannerContainer) {
-        bannerContainer.removeChild(initScript);
-        bannerContainer.removeChild(loadScript);
-      }
-    };
-  }, []);
-
   const handleFormatChange = (formatId: string) => {
     if (!result?.formats) {
       return;
