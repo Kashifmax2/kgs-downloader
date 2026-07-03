@@ -73,8 +73,8 @@ def _looks_like_netscape_cookie_file(path: str) -> bool:
 
 def _build_format_options(info):
     formats = info.get("formats") or []
-    options = []
-    seen = set()
+    best = {}
+    ext_priority = {"mp4": 0, "m4a": 1, "webm": 2, "flac": 3, "mp3": 4, "unknown": 10}
 
     for fmt in formats:
         if not fmt or not fmt.get("url"):
@@ -85,58 +85,71 @@ def _build_format_options(info):
         if acodec == "none" and vcodec == "none":
             continue
 
+        if vcodec != "none" and acodec != "none":
+            media_type = "combined"
+        elif vcodec != "none":
+            media_type = "video"
+        else:
+            media_type = "audio"
+
         height = fmt.get("height")
         if height:
             quality = f"{height}p"
         else:
             quality = fmt.get("format_note") or fmt.get("format_id") or "audio"
 
-        ext = fmt.get("ext") or "mp4"
+        ext = fmt.get("ext") or "unknown"
         fps = fmt.get("fps")
-        media_type = "combined"
-        if acodec == "none":
-            media_type = "video"
-        elif vcodec == "none":
-            media_type = "audio"
 
-        label_parts = []
-        if media_type == "video":
-            label_parts.append(f"{quality} video")
-        elif media_type == "audio":
-            bitrate = fmt.get("abr")
-            if bitrate:
-                label_parts.append(f"audio {int(bitrate)}kbps")
-            else:
-                label_parts.append("audio")
+        if media_type == "audio":
+            label = f"audio"
+            if fmt.get("abr"):
+                label += f" {int(fmt.get('abr'))}kbps"
+            label += f" · {ext}"
+        elif media_type == "video":
+            label = f"{quality} video"
+            if fps:
+                label += f" {fps}fps"
+            label += f" · {ext}"
         else:
-            label_parts.append(quality)
+            label = f"{quality}"
+            if fps:
+                label += f" {fps}fps"
+            label += f" · {ext}"
 
-        if fps:
-            label_parts.append(f"{fps}fps")
-        label = " ".join(label_parts) + f" · {ext}"
+        format_id = fmt.get("format_id") or f"{quality}-{media_type}-{ext}"
+        key = (quality, media_type)
 
-        format_id = fmt.get("format_id") or quality
-        key = (quality, ext, format_id, media_type)
-        if key in seen:
-            continue
-        seen.add(key)
+        score = (
+            0 if media_type == "combined" else 1 if media_type == "video" else 2,
+            height or 0,
+            fmt.get("tbr") or 0,
+            fmt.get("abr") or 0,
+            -ext_priority.get(ext, 10),
+        )
 
-        options.append({
-            "label": label,
-            "quality": quality,
-            "ext": ext,
-            "format_id": format_id,
-            "height": height or 0,
-            "tbr": fmt.get("tbr") or fmt.get("abr") or 0,
-            "url": f"/api/proxy?url={quote(fmt.get('url'), safe='')}" ,
-            "media_type": media_type,
-        })
+        candidate = best.get(key)
+        if candidate is None or score > candidate["score"]:
+            best[key] = {
+                "label": label,
+                "quality": quality,
+                "ext": ext,
+                "format_id": format_id,
+                "height": height or 0,
+                "tbr": fmt.get("tbr") or fmt.get("abr") or 0,
+                "url": f"/api/proxy?url={quote(fmt.get('url'), safe='')}",
+                "media_type": media_type,
+                "score": score,
+            }
 
+    options = [value for value in best.values()]
     options.sort(key=lambda item: (
         0 if item["media_type"] == "combined" else 1 if item["media_type"] == "video" else 2,
-        -(item["height"] or 0),
+        -item["height"],
         -item["tbr"],
     ))
+    for option in options:
+        option.pop("score", None)
     return options
 
 
