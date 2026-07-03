@@ -66,8 +66,46 @@ function App() {
   const [showAdOverlay, setShowAdOverlay] = useState(false);
   const [adCountdown, setAdCountdown] = useState(4);
   const [pendingDownloadUrl, setPendingDownloadUrl] = useState<string | null>(null);
+  const [popunderLoaded, setPopunderLoaded] = useState(false);
 
   const apiUrl = import.meta.env.VITE_API_URL || '';
+
+  useEffect(() => {
+    const bannerContainer = document.getElementById('adsterra-banner');
+    if (!bannerContainer) {
+      return;
+    }
+
+    const initScript = document.createElement('script');
+    initScript.type = 'text/javascript';
+    initScript.innerHTML = `
+      atOptions = {
+        'key' : '56dc67e7fb7e32c9fcfe7e5468e8aa03',
+        'format' : 'iframe',
+        'height' : 250,
+        'width' : 300,
+        'params' : {}
+      };
+    `;
+
+    const loadScript = document.createElement('script');
+    loadScript.src = 'https://www.highperformanceformat.com/56dc67e7fb7e32c9fcfe7e5468e8aa03/invoke.js';
+    loadScript.async = true;
+    loadScript.onload = () => setPopunderLoaded(true);
+    loadScript.onerror = () => setPopunderLoaded(false);
+
+    bannerContainer.appendChild(initScript);
+    bannerContainer.appendChild(loadScript);
+
+    return () => {
+      if (bannerContainer.contains(initScript)) {
+        bannerContainer.removeChild(initScript);
+      }
+      if (bannerContainer.contains(loadScript)) {
+        bannerContainer.removeChild(loadScript);
+      }
+    };
+  }, []);
 
   const handleFormatChange = (formatId: string) => {
     if (!result?.formats) {
@@ -398,7 +436,7 @@ function App() {
                   Advertisement is playing. Your download will start after the countdown.
                 </p>
                 <div className="ad-placeholder h-48 rounded-2xl border border-dashed border-gray-700 bg-dark-300/70 flex items-center justify-center text-sm text-gray-400 mb-6">
-                  Adsterra pre-download ad area
+                  {popunderLoaded ? 'Adsterra pre-download ad area' : 'Loading ad...' }
                 </div>
                 <button
                   type="button"
