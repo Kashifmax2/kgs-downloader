@@ -233,13 +233,14 @@ def extract_video():
             if not selected_format and formats:
                 selected_format = formats[0]
 
-            download_url = selected_format["url"] if selected_format else f"/api/proxy?url={quote(video_url, safe='')}"
+            download_url = selected_format["proxy_url"] if selected_format else f"/api/proxy?url={quote(video_url, safe='')}"
             result_quality = selected_format["quality"] if selected_format else "best"
 
             return jsonify({
                 "title": info.get("title"),
                 "thumbnail": info.get("thumbnail"),
                 "download_url": download_url,
+                "direct_url": selected_format["url"] if selected_format else video_url,
                 "proxy_url": selected_format["proxy_url"] if selected_format else (f"/api/proxy?url={quote(video_url, safe='')}" if video_url else None),
                 "formats": formats,
                 "quality": result_quality,

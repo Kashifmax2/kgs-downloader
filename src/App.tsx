@@ -76,11 +76,9 @@ function App() {
       return;
     }
 
-    const downloadUrl = selected.url
-      ? selected.url
-      : selected.proxy_url
-        ? `${apiUrl}${selected.proxy_url}`
-        : '';
+    const downloadUrl = selected.proxy_url
+      ? `${apiUrl}${selected.proxy_url}`
+      : selected.url || '';
     setSelectedFormatId(formatId);
     setResult({ ...result, downloadUrl, quality: selected.label, selectedFormatId: formatId });
   };
