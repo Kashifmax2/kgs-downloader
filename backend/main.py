@@ -320,13 +320,21 @@ def proxy_video():
             stream=True,
             timeout=60,
         )
-        if remote.status_code != 200:
+        if remote.status_code not in (200, 206):
             return jsonify({"detail": f"Remote request failed with status {remote.status_code}"}), remote.status_code
+
+        response_headers = {
+            "Content-Disposition": "attachment; filename=\"video.mp4\""
+        }
+        content_type = remote.headers.get("Content-Type") or "application/octet-stream"
+        if remote.headers.get("Content-Disposition"):
+            response_headers["Content-Disposition"] = remote.headers.get("Content-Disposition")
 
         return Response(
             remote.iter_content(chunk_size=1024 * 1024),
-            content_type=remote.headers.get("Content-Type", "application/octet-stream"),
-            headers={"Content-Disposition": "attachment; filename=\"video.mp4\""},
+            status=remote.status_code,
+            content_type=content_type,
+            headers=response_headers,
         )
     except requests.RequestException as exc:
         return jsonify({"detail": str(exc)}), 502
