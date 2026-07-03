@@ -130,6 +130,7 @@ def _build_format_options(info):
 
         candidate = best.get(key)
         if candidate is None or score > candidate["score"]:
+            raw_url = fmt.get("url")
             best[key] = {
                 "label": label,
                 "quality": quality,
@@ -137,7 +138,8 @@ def _build_format_options(info):
                 "format_id": format_id,
                 "height": height or 0,
                 "tbr": fmt.get("tbr") or fmt.get("abr") or 0,
-                "url": f"/api/proxy?url={quote(fmt.get('url'), safe='')}",
+                "url": raw_url,
+                "proxy_url": f"/api/proxy?url={quote(raw_url, safe='')}",
                 "media_type": media_type,
                 "score": score,
             }
@@ -238,6 +240,7 @@ def extract_video():
                 "title": info.get("title"),
                 "thumbnail": info.get("thumbnail"),
                 "download_url": download_url,
+                "proxy_url": selected_format["proxy_url"] if selected_format else (f"/api/proxy?url={quote(video_url, safe='')}" if video_url else None),
                 "formats": formats,
                 "quality": result_quality,
                 "selected_format_id": selected_format["format_id"] if selected_format else None,

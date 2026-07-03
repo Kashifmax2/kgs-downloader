@@ -9,6 +9,7 @@ interface FormatOption {
   height: number;
   tbr: number;
   url: string;
+  proxy_url?: string;
   media_type: 'combined' | 'video' | 'audio';
 }
 
@@ -75,7 +76,11 @@ function App() {
       return;
     }
 
-    const downloadUrl = selected.url.startsWith('/api/') ? `${apiUrl}${selected.url}` : selected.url;
+    const downloadUrl = selected.url
+      ? selected.url
+      : selected.proxy_url
+        ? `${apiUrl}${selected.proxy_url}`
+        : '';
     setSelectedFormatId(formatId);
     setResult({ ...result, downloadUrl, quality: selected.label, selectedFormatId: formatId });
   };
@@ -115,7 +120,7 @@ function App() {
         throw new Error('No downloadable content found');
       }
 
-      const downloadUrl = data.download_url.startsWith('/api/')
+      const downloadUrl = data.download_url && data.download_url.startsWith('/api/')
         ? `${apiUrl}${data.download_url}`
         : data.download_url;
 
