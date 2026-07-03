@@ -9,6 +9,7 @@ interface FormatOption {
   height: number;
   tbr: number;
   url: string;
+  media_type: 'combined' | 'video' | 'audio';
 }
 
 interface VideoResult {
@@ -19,6 +20,7 @@ interface VideoResult {
   format: string;
   quality: string;
   formats?: FormatOption[];
+  selectedFormatId?: string;
 }
 
 interface FAQItem {
@@ -58,24 +60,24 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VideoResult | null>(null);
-  const [selectedQuality, setSelectedQuality] = useState<string | null>(null);
+  const [selectedFormatId, setSelectedFormatId] = useState<string | null>(null);
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   const apiUrl = import.meta.env.VITE_API_URL || '';
 
-  const handleQualityChange = (quality: string) => {
-    setSelectedQuality(quality);
+  const handleFormatChange = (formatId: string) => {
     if (!result?.formats) {
       return;
     }
 
-    const selected = result.formats.find((fmt) => fmt.quality === quality);
+    const selected = result.formats.find((fmt) => fmt.format_id === formatId);
     if (!selected) {
       return;
     }
 
     const downloadUrl = selected.url.startsWith('/api/') ? `${apiUrl}${selected.url}` : selected.url;
-    setResult({ ...result, downloadUrl, quality: selected.quality });
+    setSelectedFormatId(formatId);
+    setResult({ ...result, downloadUrl, quality: selected.label, selectedFormatId: formatId });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,7 +100,7 @@ function App() {
         },
         body: JSON.stringify({
           url: url.trim(),
-          quality: selectedQuality,
+          format_id: selectedFormatId,
         }),
       });
 
@@ -118,8 +120,8 @@ function App() {
         : data.download_url;
 
       const formats = data.formats || [];
-      const initialQuality = data.quality || (formats[0]?.quality ?? 'best');
-      setSelectedQuality(initialQuality);
+      const initialFormatId = data.selected_format_id || formats[0]?.format_id || null;
+      setSelectedFormatId(initialFormatId);
       setResult({
         title: data.title || 'Video',
         thumbnail: data.thumbnail,
@@ -128,6 +130,7 @@ function App() {
         format: data.format || 'mp4',
         quality: data.quality || 'best',
         formats,
+        selectedFormatId: initialFormatId,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred. Please try again.');
@@ -140,9 +143,22 @@ function App() {
     window.open(downloadUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const toggleFaq = (index: number) => {
-    setOpenFaqIndex(openFaqIndex === index ? null : index);
-  };
+  const selectedFormat = result?.formats?.find((fmt) => fmt.format_id === selectedFormatId) || result?.formats?.[0];
+  const downloadButtonText = selectedFormat
+    ? selectedFormat.media_type === 'audio'
+      ? `Download ${selectedFormat.label}`
+      : selectedFormat.media_type === 'video'
+        ? `Download ${selectedFormat.label} (video only)`
+        : `Download ${selectedFormat.label}`
+    : 'Download MP4';
+
+  const selectedFormatDescription = selectedFormat
+    ? selectedFormat.media_type === 'audio'
+      ? 'Audio only file. Use this to add audio to video during editing.'
+      : selectedFormat.media_type === 'video'
+        ? 'Video only file. No audio included.'
+        : 'Video + audio file.'
+    : '';
 
   return (
     <div className="min-h-screen bg-gradient-dark">
@@ -268,29 +284,32 @@ function App() {
 
                   {result.formats && result.formats.length > 0 && (
                     <div className="flex flex-col gap-2">
-                      <label className="text-xs uppercase tracking-[0.2em] text-gray-400">Choose quality</label>
+                      <label className="text-xs uppercase tracking-[0.2em] text-gray-400">Choose format</label>
                       <div className="grid grid-cols-3 gap-2">
                         {result.formats.map((format) => (
                           <button
                             key={format.format_id}
                             type="button"
-                            onClick={() => handleQualityChange(format.quality)}
-                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${selectedQuality === format.quality ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-gray-700 bg-dark-300 text-gray-300 hover:border-primary-500 hover:text-white'}`}
+                            onClick={() => handleFormatChange(format.format_id)}
+                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${selectedFormatId === format.format_id ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-gray-700 bg-dark-300 text-gray-300 hover:border-primary-500 hover:text-white'}`}
                           >
-                            {format.quality}
+                            {format.label}
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
+                  {selectedFormatDescription && (
+                    <p className="text-xs text-gray-400">{selectedFormatDescription}</p>
+                  )}
                 </div>
                 <button
                   onClick={() => handleDownload(result.downloadUrl)}
                   className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
-                  aria-label={`Download ${result.title} as MP4`}
+                  aria-label={downloadButtonText}
                 >
                   <Download className="w-5 h-5" aria-hidden="true" />
-                  <span>Download MP4</span>
+                  <span>{downloadButtonText}</span>
                 </button>
               </div>
             </div>

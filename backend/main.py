@@ -44,11 +44,6 @@ YDL_OPTIONS = {
     "quiet": False,
     "nocheckcertificate": True,
     "geo_bypass": True,
-    "extractor_args": {
-        "youtube": {
-            "player_client": "android",
-        }
-    },
     "http_headers": {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     },
@@ -85,24 +80,43 @@ def _build_format_options(info):
         if not fmt or not fmt.get("url"):
             continue
 
-        if fmt.get("acodec") == "none" or fmt.get("vcodec") == "none":
+        acodec = fmt.get("acodec")
+        vcodec = fmt.get("vcodec")
+        if acodec == "none" and vcodec == "none":
             continue
 
         height = fmt.get("height")
         if height:
             quality = f"{height}p"
         else:
-            quality = fmt.get("format_note") or fmt.get("format_id") or "unknown"
+            quality = fmt.get("format_note") or fmt.get("format_id") or "audio"
 
         ext = fmt.get("ext") or "mp4"
         fps = fmt.get("fps")
-        label = quality
+        media_type = "combined"
+        if acodec == "none":
+            media_type = "video"
+        elif vcodec == "none":
+            media_type = "audio"
+
+        label_parts = []
+        if media_type == "video":
+            label_parts.append(f"{quality} video")
+        elif media_type == "audio":
+            bitrate = fmt.get("abr")
+            if bitrate:
+                label_parts.append(f"audio {int(bitrate)}kbps")
+            else:
+                label_parts.append("audio")
+        else:
+            label_parts.append(quality)
+
         if fps:
-            label += f" {fps}fps"
-        label = f"{label} · {ext}"
+            label_parts.append(f"{fps}fps")
+        label = " ".join(label_parts) + f" · {ext}"
 
         format_id = fmt.get("format_id") or quality
-        key = (quality, ext, format_id)
+        key = (quality, ext, format_id, media_type)
         if key in seen:
             continue
         seen.add(key)
@@ -113,11 +127,16 @@ def _build_format_options(info):
             "ext": ext,
             "format_id": format_id,
             "height": height or 0,
-            "tbr": fmt.get("tbr") or 0,
-            "url": f"/api/proxy?url={quote(fmt.get('url'), safe='')}"
+            "tbr": fmt.get("tbr") or fmt.get("abr") or 0,
+            "url": f"/api/proxy?url={quote(fmt.get('url'), safe='')}" ,
+            "media_type": media_type,
         })
 
-    options.sort(key=lambda item: (item["height"], item["tbr"]), reverse=True)
+    options.sort(key=lambda item: (
+        0 if item["media_type"] == "combined" else 1 if item["media_type"] == "video" else 2,
+        -(item["height"] or 0),
+        -item["tbr"],
+    ))
     return options
 
 
@@ -189,10 +208,10 @@ def extract_video():
                 formats = _build_format_options(info)
 
             selected_format = None
-            quality = data.get("quality")
-            if quality and formats:
+            selected_id = data.get("format_id")
+            if selected_id and formats:
                 for fmt in formats:
-                    if fmt["quality"] == quality:
+                    if fmt["format_id"] == selected_id:
                         selected_format = fmt
                         break
 
@@ -208,6 +227,7 @@ def extract_video():
                 "download_url": download_url,
                 "formats": formats,
                 "quality": result_quality,
+                "selected_format_id": selected_format["format_id"] if selected_format else None,
             })
     except Exception as exc:
         error_text = str(exc)
