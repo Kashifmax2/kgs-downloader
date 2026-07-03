@@ -326,12 +326,13 @@ function App() {
 
         {/* Results */}
         {result && (
-          <section aria-labelledby="result-heading" className="card p-6 md:p-8 glow animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 id="result-heading" className="sr-only">Video Download Ready</h2>
-            <div className="flex flex-col md:flex-row gap-6 mb-6">
-              {result.thumbnail && (
-                <div className="flex-shrink-0">
-                  <img
+          <>
+            <section aria-labelledby="result-heading" className="card p-6 md:p-8 glow animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <h2 id="result-heading" className="sr-only">Video Download Ready</h2>
+              <div className="flex flex-col md:flex-row gap-6 mb-6">
+                {result.thumbnail && (
+                  <div className="flex-shrink-0">
+                    <img
                     src={result.thumbnail}
                     alt={`Thumbnail for ${result.title}`}
                     className="w-full md:w-48 h-32 object-cover rounded-lg"
@@ -441,6 +442,7 @@ function App() {
               </div>
             </div>
           )}
+          </>
         )}
 
         {/* Features Section */}
