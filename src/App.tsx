@@ -144,6 +144,10 @@ function App() {
   };
 
   const selectedFormat = result?.formats?.find((fmt) => fmt.format_id === selectedFormatId) || result?.formats?.[0];
+  const combinedFormats = result?.formats?.filter((fmt) => fmt.media_type === 'combined') || [];
+  const videoOnlyFormats = result?.formats?.filter((fmt) => fmt.media_type === 'video') || [];
+  const audioOnlyFormats = result?.formats?.filter((fmt) => fmt.media_type === 'audio') || [];
+
   const downloadButtonText = selectedFormat
     ? selectedFormat.media_type === 'audio'
       ? `Download ${selectedFormat.label}`
@@ -154,7 +158,7 @@ function App() {
 
   const selectedFormatDescription = selectedFormat
     ? selectedFormat.media_type === 'audio'
-      ? 'Audio only file. Use this to add audio to video during editing.'
+      ? 'Audio only file. Use this for editing or adding sound later.'
       : selectedFormat.media_type === 'video'
         ? 'Video only file. No audio included.'
         : 'Video + audio file.'
@@ -283,19 +287,53 @@ function App() {
                   </div>
 
                   {result.formats && result.formats.length > 0 && (
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs uppercase tracking-[0.2em] text-gray-400">Choose format</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {result.formats.map((format) => (
-                          <button
-                            key={format.format_id}
-                            type="button"
-                            onClick={() => handleFormatChange(format.format_id)}
-                            className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${selectedFormatId === format.format_id ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-gray-700 bg-dark-300 text-gray-300 hover:border-primary-500 hover:text-white'}`}
-                          >
-                            {format.label}
-                          </button>
-                        ))}
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-2">Video + Audio</p>
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          {combinedFormats.map((format) => (
+                            <button
+                              key={format.format_id}
+                              type="button"
+                              onClick={() => handleFormatChange(format.format_id)}
+                              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${selectedFormatId === format.format_id ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-gray-700 bg-dark-300 text-gray-300 hover:border-primary-500 hover:text-white'}`}
+                            >
+                              {format.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-2">Video Only</p>
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          {videoOnlyFormats.map((format) => (
+                            <button
+                              key={format.format_id}
+                              type="button"
+                              onClick={() => handleFormatChange(format.format_id)}
+                              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${selectedFormatId === format.format_id ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-gray-700 bg-dark-300 text-gray-300 hover:border-primary-500 hover:text-white'}`}
+                            >
+                              {format.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-gray-400 mb-2">Audio Only</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {audioOnlyFormats.map((format) => (
+                            <button
+                              key={format.format_id}
+                              type="button"
+                              onClick={() => handleFormatChange(format.format_id)}
+                              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${selectedFormatId === format.format_id ? 'border-primary-500 bg-primary-500/10 text-white' : 'border-gray-700 bg-dark-300 text-gray-300 hover:border-primary-500 hover:text-white'}`}
+                            >
+                              {format.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}
